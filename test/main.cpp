@@ -4,61 +4,66 @@
 #include <array>
 #include <deque>
 
-#include <histogram_quantiles.hpp>
+#include <quern/histogram_tracked.hpp>
 
 
-edb::quantile_position<> p_quantiles[] = {
+using namespace quern::literals;
 
+
+quern::quantile_fraction<> p_quantiles[] =
+{
 #if 0
-	{{1,2}}
+	{1,2}
 #else
 	// Extrema
-	{{1,100}}, {{5,100}}, {{10,100}},
+	1/100_quo, 5/100_quo, 10/100_quo,
 
 	// Median & quartiles
-	{{1,4}},
-	{{1,2}},
-		{{2,4}},
-	{{3,4}},
+	1/4_quo,
+	1/2_quo,
+		2/4_quo,
+	3/4_quo,
 
 	// Extrema
-	{{90,100}}, {{95,100}}, {{99,100}},
+	90/100_quo, 95/100_quo, 99/100_quo,
 #endif
 };
 
 
-using Histogram32 = edb::histogram_basic<std::array<size_t, 32>>;
+using Histogram32 = quern::histogram<float>;
+
 
 struct QuantileTester :
-	public edb::quantile_tracker<Histogram32>
+	public quern::histogram_tracked<Histogram32>
 {
-
+public:
 	QuantileTester() :
-		quantile_tracker(std::vector<edb::quantile_position<>>
-			(p_quantiles, p_quantiles+ sizeof(p_quantiles)/sizeof(p_quantiles[0]) ))
+		histogram_tracked(quern::binning_params<float>{0.f, 32.f, 32})
 	{
+		histogram_tracked::add_quantiles(p_quantiles);
 	}
 
 	~QuantileTester()
 	{
 	}
 
+#if 1
 	void print()
 	{
 		auto &hist = histogram();
-		std::cout << "\tHistogram:  population " << hist.population() << std::endl;
-		for (size_t i = 0; i < hist.size(); ++i)
+		std::cout << "\tHistogram:  population " << population() << std::endl;
+		for (auto i = hist.begin(), e = hist.end(); i < e; ++i)
 		{
 			for (auto &q : quantiles())
-				if (q.range.is_range() && q.range.upper == i)
+				if (q.index_range.is_range() && q.index_range.upper == i.index())
 					std::cout << "\t\t\t<-" << q.quantile.num << "/" << q.quantile.den
-						<< "  (" << q.range.lower << "," << q.range.upper << ")" << std::endl;
+						<< "  (" << q.index_range.lower << "," << q.index_range.upper << ")" << std::endl;
 
-			if (hist[i] == 0) continue;
+			if (*i == 0) continue;
 
 			// Histogram bar
-			std::cout << "\t" << std::setw(4) << i << ":" << std::setw(5) << hist[i] << " ";
-			size_t nibs = 100 - (100*(hist.population()-hist[i]) / hist.population());
+			std::cout << "\t" << std::setw(4) << i.index() << ":" << std::setw(5) << *i << " ";
+			size_t nibs = 100 - (100*(population()-*i) / population());
 			for (size_t i = 0; i < nibs; ++i)
 			{
 				std::cout << '=';
@@ -67,7 +72,7 @@ struct QuantileTester :
 			// Value quantiles at this position
 			unsigned quantiles_here = 0;
 			for (auto &q : quantiles())
-				if (q.range.is_value() && q.range.lower == i)
+				if (q.index_range.is_value() && q.index_range.lower == i.index())
 					std::cout << (quantiles_here++ ? ", " : " <- ") << q.quantile.num << "/" << q.quantile.den;
 
 			std::cout << std::endl;
@@ -81,7 +86,7 @@ struct QuantileTester :
 		{
 			if (!printedHeading)
 				std::cout << "\tConsistency Checks (" << context
-					<< "): population " << histogram().population() << std::endl;
+					<< "): population " << population() << std::endl;
 			printedHeading = true;
 		};
 
@@ -92,8 +97,8 @@ struct QuantileTester :
 			for (auto &q : quantiles())
 			{
 				size_t count = 0;
-				for (size_t i = 0, e = q.range.upper; i < e; ++i)
-					count += hist[i];
+				for (size_t i = 0, e = q.index_range.upper; i < e; ++i)
+					count += hist.count_at(i);
 
 				if (count != q.samples_lower)
 				{
@@ -108,18 +113,20 @@ struct QuantileTester :
 			// Correct quantile values
 			for (auto &q : quantiles())
 			{
-				auto expected = hist.find_quantile(q.quantile.num, q.quantile.den);
+				auto expected = find_quantile_indexes(hist, q.quantile);
 
 				bool consistent = true;
-				if (expected.lower != q.range.lower) consistent = false;
-				if (expected.upper != q.range.upper) consistent = false;
+				if (expected.lower != q.index_range.lower) consistent = false;
+				if (expected.upper != q.index_range.upper) consistent = false;
 
 				if (!consistent)
 				{
 					printHeading();
 					std::cout << "\t\tBad quantile " << q.quantile.num << "/" << q.quantile.den
-						<< " .. location is " << q.range.lower << ":" << q.range.upper
-						<< " but histogram evaluates to " << expected.lower << ":" << expected.upper << std::endl;
+						<< " .. location is " << q.index_range.lower << ":" << q.index_range.upper
+						<< " but histogram evaluates to " << expected.lower << ":" << expected.upper
+						<< " ... last adjust " << q.last_adjust
+						<< std::endl;
 				}
 			}
 		}
@@ -134,8 +141,8 @@ struct QuantileTester :
 				std::cout
 					<< "\t\t" << std::setw(3) << q.quantile.num
 					<< "/" << std::left << std::setw(3) << q.quantile.den << std::right
-					<< " " << std::setw(3) << q.range.lower << ":"
-					<< std::left << std::setw(3) << q.range.upper << std::right
+					<< " " << std::setw(3) << q.index_range.lower << ":"
+					<< std::left << std::setw(3) << q.index_range.upper << std::right
 					<< " samples_lower = " << q.samples_lower
 					<< " ... last adjust " << q.last_adjust
 					<< std::endl;
@@ -143,6 +150,7 @@ struct QuantileTester :
 
 			std::cout << "\t**********" << std::endl;
 		}
+#endif
 	}
 };
 
@@ -192,7 +200,7 @@ int main(int argc, char **argv)
 			for (size_t i = 0; i < 1000; ++i)
 			{
 				size_t x = 0;
-				for (size_t bit = 0; bit < n; bit += 2) x += rand() % 4;
+				for (size_t maxroll = 0; maxroll < n; maxroll += 3+(maxroll&1)) x += rand() % (4+(maxroll&1));
 				test.insert(x);
 				test.consistencyCheck("random insertion");
 			}
@@ -200,7 +208,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	for (size_t pop = 10; pop < 1000; pop = pop*3 + pop/2)
+	for (size_t pop = 10; pop < 10000; pop = pop*3 + pop/2)
 	{
 		std::cout << "TEST: rolling insertions, population " << pop << std::endl;
 
