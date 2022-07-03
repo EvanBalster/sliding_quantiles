@@ -128,62 +128,66 @@ namespace quern
 		/*
 			Insert an item.
 		*/
-		void insert(sample_t new_sample)
-		{
-			count_t miss = 0;
-			_histogram.at(new_sample, miss) += 1;
-			if (!miss)
-			{
-				++_population;
-				for (auto &q : _quantiles)
-				{
-					if (new_sample < q.index_range.upper) ++q.samples_lower;
-					q.adjust(_histogram, _population);
-				}
-			}
-			else {for (auto &q : _quantiles) q.last_adjust = -2;}
-		}
-		void remove(sample_t old_sample)
-		{
-			count_t hit = 1;
-			_histogram.at(old_sample, hit) -= 1;
-			if (hit)
-			{
-				--_population;
-				for (auto &q : _quantiles)
-				{
-					if (old_sample < q.index_range.upper) --q.samples_lower;
-					q.adjust(_histogram, _population);
-				}
-			}
-			else {for (auto &q : _quantiles) q.last_adjust = -3;}
-		}
+		void insert(sample_t new_sample)    {insert_at_index(_histogram.index_for(new_sample));}
+		void remove(sample_t old_sample)    {remove_at_index(_histogram.index_for(old_sample));}
 
 		/*
 			Replace an item.
 				Essentially "moves" a sample to the insert index from the remove index.
 				This can save work for quantiles that don't need updating.
 		*/
-		void replace(sample_t new_sample, index_t old_sample)
+		void replace(sample_t new_sample, sample_t old_sample)    {replace_at_indexes(_histogram.index_for(new_sample), _histogram.index_for(old_sample));}
+
+		void insert_at_index(index_t new_index)
 		{
-			index_t new_index = _histogram.index_for(new_sample);
+			count_t miss = 0;
+			_histogram.at_index(new_index, miss) += 1;
+			if (!miss)
+			{
+				++_population;
+				for (auto &q : _quantiles)
+				{
+					if (new_index < q.index_range.upper) ++q.samples_lower;
+					q.adjust(_histogram, _population);
+				}
+			}
+			else {for (auto &q : _quantiles) q.last_adjust = -2;}
+		}
+
+		void remove_at_index(index_t old_index)
+		{
+			count_t hit = 1;
+			_histogram.at_index(old_index, hit) -= 1;
+			if (hit)
+			{
+				--_population;
+				for (auto &q : _quantiles)
+				{
+					if (old_index < q.index_range.upper) --q.samples_lower;
+					q.adjust(_histogram, _population);
+				}
+			}
+			else {for (auto &q : _quantiles) q.last_adjust = -3;}
+		}
+
+		void replace_at_indexes(index_t new_index, index_t old_index)
+		{
 			if (new_index == BIN_REJECT)
 			{
-				remove(old_sample);
+				remove_at_index(old_index);
 				return;
 			}
-			index_t old_index = _histogram.index_for(old_sample);
 			if (old_index == BIN_REJECT)
 			{
-				insert(new_sample);
+				insert_at_index(new_index);
 				return;
 			}
 
 			if (new_index != old_index)
 			{
 				count_t dummy;
-				_histogram.at_index(new_sample, dummy) += 1;
-				_histogram.at_index(old_sample, dummy) -= 1;
+				_histogram.at_index(new_index, dummy) += 1;
+				_histogram.at_index(old_index, dummy) -= 1;
 
 				for (auto &q : _quantiles)
 				{
@@ -194,7 +198,7 @@ namespace quern
 					if (new_index < q.index_range.lower && old_index < q.index_range.lower) continue;
 
 					// Adjust the quantile.
-					q.samples_lower += (new_sample < q.index_range.upper) - (old_sample < q.index_range.upper);
+					q.samples_lower += (new_index < q.index_range.upper) - (old_index < q.index_range.upper);
 					q.adjust(_histogram, _population);
 				}
 			}

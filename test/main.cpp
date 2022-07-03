@@ -93,6 +93,17 @@ public:
 		{
 			auto &hist = histogram();
 
+			// Population verification
+			{
+				auto expect = hist.calc_population();
+				if (population() != expect)
+				{
+					printHeading();
+					std::cout << "\t\tPopulation inconsistent: actual total is " << expect
+						<< " but cached value is " << population() << std::endl;
+				}
+			}
+
 			// Correct samples_lower
 			for (auto &q : quantiles())
 			{
