@@ -41,8 +41,8 @@ namespace quern
 	class grid : public grid_base
 	{
 	public:
-		static const size_t dimensionality = Dimensionality;
-		static const size_t N = Dimensionality;
+		static constexpr size_t dimensionality = Dimensionality;
+		static constexpr size_t N = Dimensionality;
 
 		// Types
 		using value_t = Value;

@@ -47,7 +47,7 @@ namespace quern
 		/*
 			Default constructor.  We won't be able to add samples...
 		*/
-		explicit histogram()    : bin_table() {}
+		explicit histogram()    : bin_table<Sample, Count, Binning>() {}
 
 		/*
 			Set up empty bins based on an array of binning rules.
@@ -125,7 +125,8 @@ namespace quern
 		const histogram<Sample, Count, Binning> &histogram,
 		const quantile_fraction<QuantileInt>      quantile)
 	{
-		static_assert(histogram.dimensionality == 1, "find_quantile requires 1D histogram.");
+		static_assert(quern::histogram<Sample,Count,Binning>::dimensionality == 1,
+			"find_quantile requires 1D histogram.");
 
 		Count numerator = quantile.num, denominator = quantile.den;
 

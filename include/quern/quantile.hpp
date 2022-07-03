@@ -29,7 +29,7 @@ namespace quern
 		};
 
 		constexpr quantile_fraction operator/(const quantile_fraction &other) const
-			{return quantile_fraction(num*o.den, den*o.num);}
+			{return quantile_fraction(num*other.den, den*other.num);}
 
 		bool operator< (const quantile_fraction &o) const noexcept    {return num*o.den <  o.num*den;}
 		bool operator<=(const quantile_fraction &o) const noexcept    {return num*o.den <= o.num*den;}
@@ -40,7 +40,7 @@ namespace quern
 
 		operator      float () const noexcept    {return num / float(den);}
 		operator      double() const noexcept    {return num / double(den);}
-		operator long double() const noexcept    {return num / long double(den);}
+		operator long double() const noexcept    {return num / (long double)(den);}
 	};
 
 	template<typename T_Int, typename T_IntQuo>

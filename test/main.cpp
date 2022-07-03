@@ -37,6 +37,9 @@ struct QuantileTester :
 	public quern::histogram_tracked<Histogram32>
 {
 public:
+	using histogram_t = Histogram32;
+	using histogram_tracked = quern::histogram_tracked<Histogram32>;
+	
 	QuantileTester() :
 		histogram_tracked(quern::binning_params<float>{0.f, 32.f, 32})
 	{

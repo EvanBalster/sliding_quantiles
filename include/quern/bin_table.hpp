@@ -34,7 +34,7 @@ namespace quern
 		using value_type = value_t;
 
 		// Dimensionality
-		static const size_t dimensionality = grid_t::dimensionality;
+		static constexpr size_t dimensionality = grid_t::dimensionality;
 
 		// Fractional coordinate
 		template<typename T_Frac>
